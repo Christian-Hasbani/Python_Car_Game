@@ -44,11 +44,22 @@ def parse_game(game_file_path: str) -> dict:
 # Fonction 2 : Affichage du jeu
 def get_game_str(game: dict, current_move_number: int) -> str:
     grid = [['.'] * game['width'] for _ in range(game['height'])]
-    colors = ['\u001b[47;30m', '\u001b[41m', '\u001b[42m', '\u001b[43m', '\u001b[44m', '\u001b[45m', '\u001b[46m']
+    
+    # Define the color codes: white for 'A', others cycle through the colors
+    colors = ['\u001b[47;30m', '\u001b[41;30m', '\u001b[42;30m', '\u001b[43;30m', 
+              '\u001b[44;30m', '\u001b[45;30m', '\u001b[46;30m']  # White first, then other colors
 
     for i, car in enumerate(game['cars']):
-        color = colors[i % len(colors)]
         name, origin, orientation, size = car
+        
+        # Assign white to 'A', other cars cycle through the remaining colors
+        if name == 'A':
+            color = colors[0]  # Car A will be white
+        else:
+            # For other cars, cycle through the rest of the colors
+            color = colors[(i - 1) % (len(colors) - 1) + 1]  # Start cycling from index 1 for the other colors
+
+        # Place the car on the grid
         for j in range(size):
             x, y = origin
             if orientation == 'h':
@@ -56,12 +67,13 @@ def get_game_str(game: dict, current_move_number: int) -> str:
             else:
                 grid[y + j][x] = f"{color}{name}\u001b[0m"
     
+    # Create the grid string with borders
     border = '+' + '-' * game['width'] + '+\n'
     grid_str = border
     for index, row in enumerate(grid):
-        if(index == game['exit'][1] and game['exit'][0] == 0):
+        if index == game['exit'][1] and game['exit'][0] == 0:
             grid_str += '.' + ''.join(row) + '|\n'
-        elif(index == game['exit'][1] and game['exit'][0] == 6):
+        elif index == game['exit'][1] and game['exit'][0] == 6:
             grid_str += '|' + ''.join(row) + '.\n'
         else:
             grid_str += '|' + ''.join(row) + '|\n'
@@ -70,27 +82,31 @@ def get_game_str(game: dict, current_move_number: int) -> str:
     grid_str += f"Moves: {current_move_number}/{game['max_moves']}"
     return grid_str
 
+
 # Fonction 3 : Déplacer une voiture
 def move_car(game: dict, car_index: int, direction: str) -> bool:
     # Fetch the car
     car = game['cars'][car_index]
     name, origin, orientation, size = car
-    print(f"Attempting to move car '{name}' at index {car_index} with orientation '{orientation}'")
-
     x, y = origin
     dx, dy = 0, 0
+    move_direction = ""
 
     # Map direction to dx, dy
     if direction == keys.UP:
         dy = -1
+        move_direction = "up"
     elif direction == keys.DOWN:
         dy = 1
+        move_direction = "down"
     elif direction == keys.LEFT:
-        dx = -1  # Horizontal movement, moving left
+        dx = -1
+        move_direction = "left"
     elif direction == keys.RIGHT:
-        dx = 1   # Horizontal movement, moving right
+        dx = 1
+        move_direction = "right"
     else:
-        print("Invalid direction input")
+        print(f"Invalid direction '{direction}'!")
         return False
 
     # Validate move against orientation
@@ -98,79 +114,55 @@ def move_car(game: dict, car_index: int, direction: str) -> bool:
         print(f"Invalid move for car '{name}': orientation={orientation}, dx={dx}, dy={dy}")
         return False
 
-    # Check for collisions and boundaries for each part of the car
+    # Calculate the new positions of all parts of the car
+    new_positions = []
     if orientation == 'h':
-        # For horizontal cars, we need to check all parts of the car (each x position)
         for i in range(size):
-            new_x = x + dx * i  # Calculate new x for each part of the car
-            new_y = y            # y stays the same for horizontal movement
-
-            print(f"Checking position: ({new_x}, {new_y})")
-            
-            # Check if the new position is out of bounds
-            if new_x < -1 or new_x >= game['width'] or new_y < -1 or new_y >= game['height']:
-                print(f"Move out of bounds for car '{name}': ({new_x}, {new_y})")
-                return False
-
-            # Check for collisions with other cars
-            for other_car in game['cars']:
-                if other_car == car:
-                    continue  # Skip collision check for the same car
-
-                ox, oy = other_car[1]
-                o_size = other_car[3]
-                occupied_positions = []
-
-                if other_car[2] == 'h':
-                    # Get occupied positions for horizontal cars
-                    occupied_positions = [(ox + i, oy) for i in range(o_size)]
-                else:
-                    # Get occupied positions for vertical cars
-                    occupied_positions = [(ox, oy + i) for i in range(o_size)]
-
-                if (new_x, new_y) in occupied_positions:
-                    print(f"Collision detected with car '{other_car[0]}' at ({new_x}, {new_y})")
-                    return False
+            new_positions.append((x + dx + i, y))
     elif orientation == 'v':
-        # Check vertical movement, similar logic but with y and dx
         for i in range(size):
-            new_x = x            # x stays the same for vertical movement
-            new_y = y + dy * i   # Calculate new y for each part of the car
+            new_positions.append((x, y + dy + i))
 
-            print(f"Checking position: ({new_x}, {new_y})")
-            
-            if new_x < -1 or new_x >= game['width'] or new_y < -1 or new_y >= game['height']:
-                print(f"Move out of bounds for car '{name}': ({new_x}, {new_y})")
+    # Check for boundary violations
+    for new_x, new_y in new_positions:
+        if new_x < 0 or new_x >= game['width'] or new_y < 0 or new_y >= game['height']:
+            print(f"Car '{name}' cannot move out of bounds to position ({new_x}, {new_y}).")
+            return False
+
+    # Check for collisions
+    for new_x, new_y in new_positions:
+        for other_car in game['cars']:
+            if other_car == car:
+                continue  # Skip collision check for the car being moved
+
+            ox, oy = other_car[1]
+            o_orientation, o_size = other_car[2], other_car[3]
+            occupied_positions = []
+
+            if o_orientation == 'h':
+                occupied_positions = [(ox + i, oy) for i in range(o_size)]
+            elif o_orientation == 'v':
+                occupied_positions = [(ox, oy + i) for i in range(o_size)]
+
+            if (new_x, new_y) in occupied_positions:
+                print(f"Collision detected: Car '{name}' at ({new_x}, {new_y}) with car '{other_car[0]}'.")
                 return False
 
-            for other_car in game['cars']:
-                if other_car == car:
-                    continue
+    # Update the car's position if all checks pass
+    if orientation == 'h':
+        car[1] = (x + dx, y)
+    elif orientation == 'v':
+        car[1] = (x, y + dy)
 
-                ox, oy = other_car[1]
-                o_size = other_car[3]
-                occupied_positions = []
-
-                if other_car[2] == 'h':
-                    occupied_positions = [(ox + i, oy) for i in range(o_size)]
-                else:
-                    occupied_positions = [(ox, oy + i) for i in range(o_size)]
-
-                if (new_x, new_y) in occupied_positions:
-                    print(f"Collision detected with car '{other_car[0]}' at ({new_x}, {new_y})")
-                    return False
-
-    # Update car position
-    car[1] = (x + dx, y + dy)
-    print(f"Car '{name}' moved to new origin: {car[1]}")
+    print(f"Car '{name}' moved {move_direction}")
     return True
-
 
 # Fonction 4 : Vérification de la victoire
 def is_win(game: dict) -> bool:
     car_a = game['cars'][0]
-    x, y = car_a[0]
-    return x + car_a[2] == game['width']
+    name, origin, orientation, size = car_a
+    x, y = origin
+    return x + size == game['width']
 
 # Fonction 5 : Démarrage/Boucle de la partie
 def play_game(game: dict) -> int:
