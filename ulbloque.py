@@ -193,7 +193,7 @@ def play_game(game: dict) -> int:
 # __main__ : Chargement et lancement
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        print("Usage: python game.py <game_file_path>")
+        print("Usage: python ulbloque.py <game_file_path>")
         sys.exit(1)
     game_file_path = sys.argv[1]
     game = parse_game(game_file_path)

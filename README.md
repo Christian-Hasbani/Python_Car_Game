@@ -73,5 +73,5 @@ pip install -r requirements.txt
 To launch the game run the following command
 
 ```bash
-python main.py "game_file.txt"
+python ulbloque.py "game_file.txt"
 ```
