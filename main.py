@@ -174,7 +174,7 @@ def play_game(game: dict) -> int:
             if car_choice == keys.ESCAPE:
                 return 2
             else:
-                print(f"You have chosen the {car_choice} car")
+                print(f"You have chosen the '{car_choice}' car")
             car_index = ord(car_choice) - ord('A')
             if car_index < 0 or car_index >= len(game['cars']):
                 continue
